@@ -4,6 +4,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -46,6 +47,12 @@ public class SuggestionController {
     @PatchMapping("/suggestions/{id}/owner-comment")
     public Suggestion updateOwnerComment(@PathVariable String id, @RequestBody OwnerCommentRequest request) throws IOException {
         return store.updateOwnerComment(id, request.ownerComment());
+    }
+
+    @DeleteMapping("/suggestions/{id}")
+    public ResponseEntity<Void> deleteSuggestion(@PathVariable String id) throws IOException {
+        store.delete(id);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/export/suggestions.md")

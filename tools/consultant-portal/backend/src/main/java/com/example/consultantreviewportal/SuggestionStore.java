@@ -76,6 +76,15 @@ public class SuggestionStore {
         return suggestion;
     }
 
+    public synchronized void delete(String id) throws IOException {
+        List<Suggestion> suggestions = readAll();
+        boolean removed = suggestions.removeIf(suggestion -> suggestion.id.equals(id));
+        if (!removed) {
+            throw new IllegalArgumentException("Suggestion was not found.");
+        }
+        writeAll(suggestions);
+    }
+
     private List<Suggestion> readAll() throws IOException {
         if (!Files.exists(storageFile)) {
             return new ArrayList<>();

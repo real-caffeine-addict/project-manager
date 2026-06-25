@@ -6,12 +6,16 @@ const STATUSES = ['Open', 'Accepted', 'Rejected', 'Needs Discussion'];
 
 async function api(path, options) {
   const response = await fetch(path, {
+    credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json', ...(options?.headers || {}) },
     ...options
   });
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: 'הפעולה נכשלה' }));
     throw new Error(error.error || 'הפעולה נכשלה');
+  }
+  if (response.status === 204) {
+    return null;
   }
   return response.json();
 }
@@ -26,13 +30,13 @@ function markdownToHtml(markdown) {
     .map((block) => {
       const text = block.trim();
       if (!text) return '';
-      if (text.startsWith('# ')) return `<h1>${text.slice(2)}</h1>`;
-      if (text.startsWith('## ')) return `<h2>${text.slice(3)}</h2>`;
-      if (text.startsWith('### ')) return `<h3>${text.slice(4)}</h3>`;
+      if (text.startsWith('# ')) return `<h1 dir="auto">${text.slice(2)}</h1>`;
+      if (text.startsWith('## ')) return `<h2 dir="auto">${text.slice(3)}</h2>`;
+      if (text.startsWith('### ')) return `<h3 dir="auto">${text.slice(4)}</h3>`;
       if (text.split('\n').every((line) => line.startsWith('- '))) {
-        return `<ul>${text.split('\n').map((line) => `<li>${line.slice(2)}</li>`).join('')}</ul>`;
+        return `<ul>${text.split('\n').map((line) => `<li dir="auto">${line.slice(2)}</li>`).join('')}</ul>`;
       }
-      return `<p>${text.replace(/\n/g, '<br />')}</p>`;
+      return `<p dir="auto">${text.replace(/\n/g, '<br />')}</p>`;
     })
     .join('');
 }
@@ -43,13 +47,27 @@ export default function App() {
   const [activeDocument, setActiveDocument] = useState(null);
   const [documentSuggestions, setDocumentSuggestions] = useState([]);
   const [allSuggestions, setAllSuggestions] = useState([]);
+  const [auth, setAuth] = useState({ loading: true, authenticated: false, email: null });
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
-    loadDocuments();
-    loadSuggestions();
+    checkAuth();
   }, []);
+
+  async function checkAuth() {
+    try {
+      const status = await api('/api/auth/status');
+      setAuth({ loading: false, authenticated: status.authenticated, email: status.email });
+      if (status.authenticated) {
+        await loadDocuments();
+        await loadSuggestions();
+      }
+    } catch (err) {
+      setAuth({ loading: false, authenticated: false, email: null });
+      setError(err.message);
+    }
+  }
 
   async function loadDocuments() {
     setDocuments(await api('/api/documents'));
@@ -75,6 +93,41 @@ export default function App() {
     await loadSuggestions();
   }
 
+  async function authenticated(email) {
+    setAuth({ loading: false, authenticated: true, email });
+    setError('');
+    await loadDocuments();
+    await loadSuggestions();
+  }
+
+  async function logout() {
+    await api('/api/auth/logout', { method: 'POST' });
+    setAuth({ loading: false, authenticated: false, email: null });
+    setDocuments([]);
+    setActiveDocument(null);
+    setDocumentSuggestions([]);
+    setAllSuggestions([]);
+    setView('documents');
+  }
+
+  if (auth.loading) {
+    return (
+      <main>
+        <header className="topbar">
+          <div>
+            <h1>Consultant Review Portal</h1>
+            <p>כלי עבודה מקומי לסקירת מסמכי Markdown</p>
+          </div>
+        </header>
+        <div className="notice">טוען...</div>
+      </main>
+    );
+  }
+
+  if (!auth.authenticated) {
+    return <AuthPage onAuthenticated={authenticated} />;
+  }
+
   return (
     <main>
       <header className="topbar">
@@ -85,6 +138,7 @@ export default function App() {
         <nav>
           <button onClick={() => setView('documents')}>מסמכים</button>
           <button onClick={() => { setView('dashboard'); loadSuggestions(); }}>סקירת הצעות</button>
+          <button className="secondary" onClick={logout}>יציאה</button>
         </nav>
       </header>
 
@@ -105,6 +159,10 @@ export default function App() {
             setMessage('ההערה נשמרה');
             await refreshActiveDocument();
           }}
+          onSuggestionDeleted={async () => {
+            setMessage('ההערה נמחקה');
+            await refreshActiveDocument();
+          }}
         />
       )}
       {view === 'dashboard' && (
@@ -115,9 +173,84 @@ export default function App() {
             setMessage('העדכון נשמר');
             await loadSuggestions();
           }}
+          onDeleted={async () => {
+            setMessage('ההערה נמחקה');
+            await loadSuggestions();
+          }}
           onError={setError}
         />
       )}
+    </main>
+  );
+}
+
+function AuthPage({ onAuthenticated }) {
+  const [form, setForm] = useState({ email: '', mobile: '', otp: '' });
+  const [challengeId, setChallengeId] = useState('');
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  function setField(field, value) {
+    setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  async function start(event) {
+    event.preventDefault();
+    setError('');
+    try {
+      const response = await api('/api/auth/start', {
+        method: 'POST',
+        body: JSON.stringify({ email: form.email, mobile: form.mobile })
+      });
+      setChallengeId(response.challengeId);
+      setMessage('קוד חד פעמי נשלח למייל');
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function verify(event) {
+    event.preventDefault();
+    setError('');
+    try {
+      const status = await api('/api/auth/verify', {
+        method: 'POST',
+        body: JSON.stringify({ challengeId, otp: form.otp })
+      });
+      await onAuthenticated(status.email);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  return (
+    <main className="authPage">
+      <section className="authPanel">
+        <h1>Consultant Review Portal</h1>
+        {message && <div className="notice success">{message}</div>}
+        {error && <div className="notice error">{error}</div>}
+        {!challengeId ? (
+          <form onSubmit={start}>
+            <label>מייל
+              <input type="email" value={form.email} onChange={(event) => setField('email', event.target.value)} />
+            </label>
+            <label>נייד
+              <input inputMode="tel" value={form.mobile} onChange={(event) => setField('mobile', event.target.value)} />
+            </label>
+            <button type="submit">שליחת קוד</button>
+          </form>
+        ) : (
+          <form onSubmit={verify}>
+            <label>קוד חד פעמי
+              <input inputMode="numeric" value={form.otp} onChange={(event) => setField('otp', event.target.value)} />
+            </label>
+            <div className="actions">
+              <button type="submit">כניסה</button>
+              <button type="button" className="secondary" onClick={() => setChallengeId('')}>חזרה</button>
+            </div>
+          </form>
+        )}
+      </section>
     </main>
   );
 }
@@ -157,7 +290,7 @@ function DocumentsPage({ documents, onOpen }) {
   );
 }
 
-function DocumentPage({ document, suggestions, onSaved, onError, onSuggestionCreated }) {
+function DocumentPage({ document, suggestions, onSaved, onError, onSuggestionCreated, onSuggestionDeleted }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(document.content);
   const [showSuggestionForm, setShowSuggestionForm] = useState(false);
@@ -206,7 +339,7 @@ function DocumentPage({ document, suggestions, onSaved, onError, onSuggestionCre
       )}
 
       <h3>הערות והצעות למסמך</h3>
-      <SuggestionList suggestions={suggestions} />
+      <SuggestionList suggestions={suggestions} onDelete={onSuggestionDeleted} onError={onError} />
 
       {showSuggestionForm && (
         <SuggestionForm
@@ -225,12 +358,7 @@ function DocumentPage({ document, suggestions, onSaved, onError, onSuggestionCre
 
 function SuggestionForm({ document, onClose, onCreated, onError }) {
   const [form, setForm] = useState({
-    type: 'Question',
-    severity: 'Medium',
-    sectionTitle: '',
-    currentText: '',
-    suggestedText: '',
-    explanation: '',
+    suggestion: '',
     consultantName: ''
   });
   const [validation, setValidation] = useState('');
@@ -241,15 +369,18 @@ function SuggestionForm({ document, onClose, onCreated, onError }) {
 
   async function submit(event) {
     event.preventDefault();
-    if (!form.explanation.trim() || !form.consultantName.trim()) {
-      setValidation('יש למלא הסבר ושם יועץ');
+    if (!form.suggestion.trim() || !form.consultantName.trim()) {
+      setValidation('יש למלא הצעה ושם');
       return;
     }
     try {
       await api('/api/suggestions', {
         method: 'POST',
         body: JSON.stringify({
-          ...form,
+          type: 'Question',
+          severity: 'Medium',
+          explanation: form.suggestion,
+          consultantName: form.consultantName,
           documentPath: document.relativePath,
           documentTitle: document.title
         })
@@ -265,25 +396,10 @@ function SuggestionForm({ document, onClose, onCreated, onError }) {
       <form onSubmit={submit}>
         <h2>הוספת הצעת שינוי</h2>
         {validation && <p className="formError">{validation}</p>}
-        <label>סוג
-          <select value={form.type} onChange={(event) => setField('type', event.target.value)}>{TYPES.map((value) => <option key={value}>{value}</option>)}</select>
+        <label>הצעה
+          <textarea value={form.suggestion} onChange={(event) => setField('suggestion', event.target.value)} />
         </label>
-        <label>חומרה
-          <select value={form.severity} onChange={(event) => setField('severity', event.target.value)}>{SEVERITIES.map((value) => <option key={value}>{value}</option>)}</select>
-        </label>
-        <label>כותרת סעיף
-          <input value={form.sectionTitle} onChange={(event) => setField('sectionTitle', event.target.value)} />
-        </label>
-        <label>טקסט נוכחי
-          <textarea value={form.currentText} onChange={(event) => setField('currentText', event.target.value)} />
-        </label>
-        <label>טקסט מוצע
-          <textarea value={form.suggestedText} onChange={(event) => setField('suggestedText', event.target.value)} />
-        </label>
-        <label>הסבר
-          <textarea value={form.explanation} onChange={(event) => setField('explanation', event.target.value)} />
-        </label>
-        <label>שם יועץ
+        <label>שם
           <input value={form.consultantName} onChange={(event) => setField('consultantName', event.target.value)} />
         </label>
         <div className="actions">
@@ -295,7 +411,7 @@ function SuggestionForm({ document, onClose, onCreated, onError }) {
   );
 }
 
-function ReviewDashboard({ suggestions, documents, onChanged, onError }) {
+function ReviewDashboard({ suggestions, documents, onChanged, onDeleted, onError }) {
   const [filters, setFilters] = useState({ document: '', status: '', type: '', severity: '' });
   const [selected, setSelected] = useState(null);
 
@@ -333,28 +449,42 @@ function ReviewDashboard({ suggestions, documents, onChanged, onError }) {
           {SEVERITIES.map((value) => <option key={value}>{value}</option>)}
         </select>
       </div>
-      <SuggestionList suggestions={filtered} onSelect={setSelected} />
-      {selected && <SuggestionDetails suggestion={selected} onClose={() => setSelected(null)} onChanged={onChanged} onError={onError} />}
+      <SuggestionList suggestions={filtered} onSelect={setSelected} onDelete={onDeleted} onError={onError} />
+      {selected && <SuggestionDetails suggestion={selected} onClose={() => setSelected(null)} onChanged={onChanged} onDeleted={onDeleted} onError={onError} />}
     </section>
   );
 }
 
-function SuggestionList({ suggestions, onSelect }) {
+function SuggestionList({ suggestions, onSelect, onDelete, onError }) {
+  async function removeSuggestion(event, suggestion) {
+    event.stopPropagation();
+    if (!window.confirm('למחוק את ההערה?')) return;
+    try {
+      await api(`/api/suggestions/${suggestion.id}`, { method: 'DELETE' });
+      await onDelete?.();
+    } catch (err) {
+      onError?.(err.message);
+    }
+  }
+
   if (!suggestions.length) return <p className="empty">אין הערות להצגה</p>;
   return (
     <div className="suggestions">
       {suggestions.map((suggestion) => (
-        <button className="suggestionItem" key={suggestion.id} onClick={() => onSelect?.(suggestion)}>
-          <strong>{suggestion.documentTitle}</strong>
-          <span>{suggestion.type} · {suggestion.severity} · {suggestion.status}</span>
-          <span>{suggestion.explanation}</span>
-        </button>
+        <div className="suggestionItem" key={suggestion.id}>
+          <button className="suggestionSummary" onClick={() => onSelect?.(suggestion)}>
+            <strong>{suggestion.documentTitle}</strong>
+            <span>{suggestion.type} · {suggestion.severity} · {suggestion.status}</span>
+            <span>{suggestion.explanation}</span>
+          </button>
+          <button className="danger" onClick={(event) => removeSuggestion(event, suggestion)}>מחיקה</button>
+        </div>
       ))}
     </div>
   );
 }
 
-function SuggestionDetails({ suggestion, onClose, onChanged, onError }) {
+function SuggestionDetails({ suggestion, onClose, onChanged, onDeleted, onError }) {
   const [status, setStatus] = useState(suggestion.status);
   const [ownerComment, setOwnerComment] = useState(suggestion.ownerComment || '');
 
@@ -376,6 +506,17 @@ function SuggestionDetails({ suggestion, onClose, onChanged, onError }) {
     }
   }
 
+  async function removeSuggestion() {
+    if (!window.confirm('למחוק את ההערה?')) return;
+    try {
+      await api(`/api/suggestions/${suggestion.id}`, { method: 'DELETE' });
+      onClose();
+      await onDeleted();
+    } catch (err) {
+      onError(err.message);
+    }
+  }
+
   return (
     <div className="modal" role="dialog" aria-modal="true" aria-label="פרטי הצעה">
       <div>
@@ -392,6 +533,7 @@ function SuggestionDetails({ suggestion, onClose, onChanged, onError }) {
         <div className="actions">
           <button onClick={saveStatus}>שמירת סטטוס</button>
           <button onClick={saveComment}>שמירת תגובה</button>
+          <button className="danger" onClick={removeSuggestion}>מחיקה</button>
           <button className="secondary" onClick={onClose}>סגירה</button>
         </div>
       </div>

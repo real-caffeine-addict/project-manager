@@ -44,6 +44,16 @@ class SuggestionStoreTest {
         assertThat(updated.ownerComment).isEqualTo("נבדוק עם בעל התהליך");
     }
 
+    @Test
+    void deletesSuggestion() throws Exception {
+        SuggestionStore store = new SuggestionStore(new ObjectMapper(), tempDir.resolve("suggestions.json").toString());
+        Suggestion created = store.create(validSuggestion());
+
+        store.delete(created.id);
+
+        assertThat(store.list()).isEmpty();
+    }
+
     private Suggestion validSuggestion() {
         Suggestion suggestion = new Suggestion();
         suggestion.documentPath = "doc.md";

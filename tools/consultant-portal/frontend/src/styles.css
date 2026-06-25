@@ -15,6 +15,22 @@ main {
   padding: 24px;
 }
 
+.authPage {
+  align-items: center;
+  display: flex;
+  min-height: 100vh;
+}
+
+.authPanel {
+  background: white;
+  border: 1px solid #d9e1e8;
+  border-radius: 6px;
+  margin: 0 auto;
+  max-width: 420px;
+  padding: 24px;
+  width: 100%;
+}
+
 .topbar,
 .sectionHeader,
 .actions,
@@ -59,6 +75,10 @@ button,
 button.secondary {
   background: white;
   color: #1f2933;
+}
+
+button.danger {
+  background: #b42318;
 }
 
 input,
@@ -127,6 +147,8 @@ textarea {
 .markdown {
   line-height: 1.7;
   margin-bottom: 24px;
+  text-align: start;
+  unicode-bidi: plaintext;
 }
 
 .editorPane textarea {
@@ -141,11 +163,24 @@ textarea {
   gap: 10px;
 }
 
-.suggestionItem {
+.suggestionItem,
+.suggestionSummary {
   background: #ffffff;
   color: #1f2933;
+}
+
+.suggestionItem {
+  align-items: start;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr auto;
+}
+
+.suggestionSummary {
+  border: 0;
   display: grid;
   gap: 6px;
+  padding: 0;
   text-align: right;
 }
 

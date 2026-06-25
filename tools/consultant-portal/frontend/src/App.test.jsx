@@ -27,8 +27,12 @@ const suggestion = {
   status: 'Open'
 };
 
-function mockFetch({ suggestions = [suggestion] } = {}) {
+function mockFetch({ suggestions = [suggestion], authenticated = true } = {}) {
   global.fetch = vi.fn(async (url, options = {}) => {
+    if (url === '/api/auth/status') return json({ authenticated, email: authenticated ? 'dana@example.com' : null });
+    if (url === '/api/auth/start') return json({ challengeId: 'challenge-1' });
+    if (url === '/api/auth/verify') return json({ authenticated: true, email: 'dana@example.com' });
+    if (url === '/api/auth/logout') return json({ authenticated: false, email: null });
     if (url === '/api/documents') return json([documentSummary]);
     if (url === '/api/suggestions' && !options.method) return json(suggestions);
     if (url === '/api/documents/cGhhc2UtMC5tZA') return json(documentContent);
@@ -37,6 +41,7 @@ function mockFetch({ suggestions = [suggestion] } = {}) {
     if (url === '/api/suggestions' && options.method === 'POST') return json({ ...suggestion, id: 's2' });
     if (url === '/api/suggestions/s1/status') return json({ ...suggestion, status: JSON.parse(options.body).status });
     if (url === '/api/suggestions/s1/owner-comment') return json({ ...suggestion, ownerComment: JSON.parse(options.body).ownerComment });
+    if (url === '/api/suggestions/s1' && options.method === 'DELETE') return { ok: true, status: 204, json: async () => null };
     throw new Error(`Unexpected request: ${url}`);
   });
 }
@@ -61,6 +66,20 @@ describe('App', () => {
 
     expect(await screen.findAllByText('phase-0.md')).toHaveLength(2);
     expect(screen.getByText('Phase 0')).toBeInTheDocument();
+  });
+
+  test('authenticates with email, mobile, and otp', async () => {
+    mockFetch({ authenticated: false });
+    render(<App />);
+
+    await userEvent.type(await screen.findByLabelText('מייל'), 'dana@example.com');
+    await userEvent.type(screen.getByLabelText('נייד'), '0501234567');
+    await userEvent.click(screen.getByRole('button', { name: 'שליחת קוד' }));
+    await userEvent.type(await screen.findByLabelText('קוד חד פעמי'), '123456');
+    await userEvent.click(screen.getByRole('button', { name: 'כניסה' }));
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/auth/verify', expect.objectContaining({ method: 'POST' })));
+    expect(await screen.findAllByText('phase-0.md')).toHaveLength(2);
   });
 
   test('renders a document viewer', async () => {
@@ -104,7 +123,7 @@ describe('App', () => {
     await userEvent.click(screen.getByRole('button', { name: 'הוספת הצעת שינוי' }));
     await userEvent.click(screen.getByRole('button', { name: 'שמירה' }));
 
-    expect(screen.getByText('יש למלא הסבר ושם יועץ')).toBeInTheDocument();
+    expect(screen.getByText('יש למלא הצעה ושם')).toBeInTheDocument();
   });
 
   test('submits a suggestion', async () => {
@@ -112,8 +131,8 @@ describe('App', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'פתיחה' }));
     await userEvent.click(screen.getByRole('button', { name: 'הוספת הצעת שינוי' }));
 
-    await userEvent.type(screen.getByLabelText('הסבר'), 'Please add acceptance criteria');
-    await userEvent.type(screen.getByLabelText('שם יועץ'), 'Dana');
+    await userEvent.type(screen.getByLabelText('הצעה'), 'Please add acceptance criteria');
+    await userEvent.type(screen.getByLabelText('שם'), 'Dana');
     await userEvent.click(screen.getByRole('button', { name: 'שמירה' }));
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/suggestions', expect.objectContaining({ method: 'POST' })));
@@ -134,5 +153,14 @@ describe('App', () => {
     const list = screen.getByText('Fix typo').closest('.suggestions');
     expect(within(list).getByText('Fix typo')).toBeInTheDocument();
     expect(screen.queryByText('Should this include billing?')).not.toBeInTheDocument();
+  });
+
+  test('removes a suggestion from the document view', async () => {
+    render(<App />);
+    await userEvent.click(await screen.findByRole('button', { name: 'פתיחה' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'מחיקה' }));
+
+    expect(window.confirm).toHaveBeenCalledWith('למחוק את ההערה?');
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/suggestions/s1', expect.objectContaining({ method: 'DELETE' })));
   });
 });
