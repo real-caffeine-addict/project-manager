@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { appendEditFooter } from './editFooter.js';
 import { MarkdownDocument, MarkdownEditor } from './MarkdownDocument.jsx';
 import { parseMarkdownDocument, serializeMarkdownBlocks } from './markdownBlocks.js';
 
@@ -130,6 +131,7 @@ export default function App() {
       {view === 'document' && activeDocument && (
         <DocumentPage
           document={activeDocument}
+          currentUser={auth.email}
           suggestions={documentSuggestions}
           onSaved={async (text) => {
             setMessage(text);
@@ -271,7 +273,7 @@ function DocumentsPage({ documents, onOpen }) {
   );
 }
 
-function DocumentPage({ document, suggestions, onSaved, onError, onSuggestionCreated, onSuggestionDeleted }) {
+function DocumentPage({ document, currentUser, suggestions, onSaved, onError, onSuggestionCreated, onSuggestionDeleted }) {
   const [editing, setEditing] = useState(false);
   const [draftBlocks, setDraftBlocks] = useState(() => parseMarkdownDocument(document.content));
   const [showSuggestionForm, setShowSuggestionForm] = useState(false);
@@ -292,7 +294,7 @@ function DocumentPage({ document, suggestions, onSaved, onError, onSuggestionCre
     try {
       await api(`/api/documents/${document.encodedPath}`, {
         method: 'PUT',
-        body: JSON.stringify({ content: serializeMarkdownBlocks(draftBlocks) })
+        body: JSON.stringify({ content: appendEditFooter(serializeMarkdownBlocks(draftBlocks), currentUser) })
       });
       onSaved('השינוי נשמר במסמך המקומי');
     } catch (err) {

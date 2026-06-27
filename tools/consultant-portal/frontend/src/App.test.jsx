@@ -178,7 +178,8 @@ describe('App', () => {
     const saveCall = global.fetch.mock.calls.find(([url, options]) => (
       url === '/api/documents/cGhhc2UtMC5tZA' && options?.method === 'PUT'
     ));
-    expect(JSON.parse(saveCall[1].body).content).toBe([
+    const savedContent = JSON.parse(saveCall[1].body).content;
+    expect(savedContent.startsWith([
       '# Phase 0',
       '',
       'Opening content',
@@ -190,8 +191,13 @@ describe('App', () => {
       '',
       '| Area | Status |',
       '| --- | --- |',
-      '| Scope | Ready |'
-    ].join('\n'));
+      '| Scope | Ready |',
+      '',
+      '<!-- consultant-portal-edit-footer:start -->',
+      'Edited by dana@example.com at '
+    ].join('\n'))).toBe(true);
+    expect(savedContent).toMatch(/Edited by dana@example\.com at \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+0[23]:00/);
+    expect(savedContent.endsWith('<!-- consultant-portal-edit-footer:end -->')).toBe(true);
   });
 
   test('edits table cells without changing table structure', async () => {
@@ -220,14 +226,20 @@ describe('App', () => {
     const saveCall = global.fetch.mock.calls.find(([url, options]) => (
       url === '/api/documents/cGhhc2UtMC5tZA' && options?.method === 'PUT'
     ));
-    expect(JSON.parse(saveCall[1].body).content).toBe([
+    const savedContent = JSON.parse(saveCall[1].body).content;
+    expect(savedContent.startsWith([
       '# Phase 0',
       '',
       '| Area | Status |',
       '| --- | --- |',
       '| Scope | Ready \\| blocked |',
-      '| Risk | Open |'
-    ].join('\n'));
+      '| Risk | Open |',
+      '',
+      '<!-- consultant-portal-edit-footer:start -->',
+      'Edited by dana@example.com at '
+    ].join('\n'))).toBe(true);
+    expect(savedContent).toMatch(/Edited by dana@example\.com at \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+0[23]:00/);
+    expect(savedContent.endsWith('<!-- consultant-portal-edit-footer:end -->')).toBe(true);
   });
 
   test('validates the suggestion form', async () => {
