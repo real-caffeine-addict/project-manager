@@ -1,8 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
+import { parseMarkdownDocument } from './markdownBlocks.js';
 
 const TYPES = ['Correction', 'Missing Scenario', 'Domain Risk', 'Contractual Risk', 'Terminology', 'Process Improvement', 'Question'];
 const SEVERITIES = ['Low', 'Medium', 'High', 'Blocking'];
 const STATUSES = ['Open', 'Accepted', 'Rejected', 'Needs Discussion'];
+const HEADING_TAGS = {
+  1: 'h1',
+  2: 'h2',
+  3: 'h3'
+};
 
 async function api(path, options) {
   const response = await fetch(path, {
@@ -18,27 +24,6 @@ async function api(path, options) {
     return null;
   }
   return response.json();
-}
-
-function markdownToHtml(markdown) {
-  const escaped = markdown
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-  return escaped
-    .split(/\n{2,}/)
-    .map((block) => {
-      const text = block.trim();
-      if (!text) return '';
-      if (text.startsWith('# ')) return `<h1 dir="auto">${text.slice(2)}</h1>`;
-      if (text.startsWith('## ')) return `<h2 dir="auto">${text.slice(3)}</h2>`;
-      if (text.startsWith('### ')) return `<h3 dir="auto">${text.slice(4)}</h3>`;
-      if (text.split('\n').every((line) => line.startsWith('- '))) {
-        return `<ul>${text.split('\n').map((line) => `<li dir="auto">${line.slice(2)}</li>`).join('')}</ul>`;
-      }
-      return `<p dir="auto">${text.replace(/\n/g, '<br />')}</p>`;
-    })
-    .join('');
 }
 
 export default function App() {
@@ -294,6 +279,7 @@ function DocumentPage({ document, suggestions, onSaved, onError, onSuggestionCre
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(document.content);
   const [showSuggestionForm, setShowSuggestionForm] = useState(false);
+  const documentBlocks = useMemo(() => parseMarkdownDocument(document.content), [document.content]);
 
   useEffect(() => {
     setDraft(document.content);
@@ -335,7 +321,7 @@ function DocumentPage({ document, suggestions, onSaved, onError, onSuggestionCre
           </div>
         </div>
       ) : (
-        <article className="markdown" dangerouslySetInnerHTML={{ __html: markdownToHtml(document.content) }} />
+        <MarkdownDocument blocks={documentBlocks} />
       )}
 
       <h3>הערות והצעות למסמך</h3>
@@ -353,6 +339,73 @@ function DocumentPage({ document, suggestions, onSaved, onError, onSuggestionCre
         />
       )}
     </section>
+  );
+}
+
+function MarkdownDocument({ blocks }) {
+  return (
+    <article className="markdown">
+      {blocks.map((block, index) => <MarkdownBlock block={block} key={index} />)}
+    </article>
+  );
+}
+
+function MarkdownBlock({ block }) {
+  if (block.type === 'heading') {
+    const HeadingTag = HEADING_TAGS[block.depth] || 'p';
+    return <HeadingTag dir="auto">{block.text}</HeadingTag>;
+  }
+
+  if (block.type === 'paragraph') {
+    return (
+      <p dir="auto">
+        {block.text.split('\n').map((line, index) => (
+          <span key={index}>
+            {index > 0 && <br />}
+            {line}
+          </span>
+        ))}
+      </p>
+    );
+  }
+
+  if (block.type === 'code') {
+    return (
+      <pre className="codeBlock" dir="ltr">
+        <code>{block.code}</code>
+      </pre>
+    );
+  }
+
+  if (block.type === 'table') {
+    return <MarkdownTable block={block} />;
+  }
+
+  return (
+    <pre className="rawMarkdownBlock" dir="auto">
+      <code>{block.raw}</code>
+    </pre>
+  );
+}
+
+function MarkdownTable({ block }) {
+  return (
+    <div className="markdownTableWrap">
+      <table className="markdownTable">
+        <thead>
+          <tr>
+            {block.header.map((cell, index) => <th key={index} dir="auto">{cell}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {block.rows.map((row, rowIndex) => (
+            <tr key={rowIndex}>
+              {row.map((cell, cellIndex) => <td key={cellIndex} dir="auto">{cell}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

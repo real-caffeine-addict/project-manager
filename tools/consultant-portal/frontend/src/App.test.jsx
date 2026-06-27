@@ -27,7 +27,7 @@ const suggestion = {
   status: 'Open'
 };
 
-function mockFetch({ suggestions = [suggestion], authenticated = true } = {}) {
+function mockFetch({ suggestions = [suggestion], authenticated = true, document = documentContent } = {}) {
   global.fetch = vi.fn(async (url, options = {}) => {
     if (url === '/api/auth/status') return json({ authenticated, email: authenticated ? 'dana@example.com' : null });
     if (url === '/api/auth/start') return json({ challengeId: 'challenge-1' });
@@ -35,9 +35,9 @@ function mockFetch({ suggestions = [suggestion], authenticated = true } = {}) {
     if (url === '/api/auth/logout') return json({ authenticated: false, email: null });
     if (url === '/api/documents') return json([documentSummary]);
     if (url === '/api/suggestions' && !options.method) return json(suggestions);
-    if (url === '/api/documents/cGhhc2UtMC5tZA') return json(documentContent);
+    if (url === '/api/documents/cGhhc2UtMC5tZA') return json(document);
     if (url === '/api/documents/cGhhc2UtMC5tZA/suggestions') return json(suggestions);
-    if (url === '/api/documents/cGhhc2UtMC5tZA' && options.method === 'PUT') return json({ ...documentContent, content: JSON.parse(options.body).content });
+    if (url === '/api/documents/cGhhc2UtMC5tZA' && options.method === 'PUT') return json({ ...document, content: JSON.parse(options.body).content });
     if (url === '/api/suggestions' && options.method === 'POST') return json({ ...suggestion, id: 's2' });
     if (url === '/api/suggestions/s1/status') return json({ ...suggestion, status: JSON.parse(options.body).status });
     if (url === '/api/suggestions/s1/owner-comment') return json({ ...suggestion, ownerComment: JSON.parse(options.body).ownerComment });
@@ -90,6 +90,47 @@ describe('App', () => {
     expect(await screen.findAllByRole('heading', { name: 'Phase 0' })).toHaveLength(2);
     expect(screen.getByText('Opening content')).toBeInTheDocument();
     expect(screen.getByText('Should this include billing?')).toBeInTheDocument();
+  });
+
+  test('renders structured markdown preview blocks without raw html', async () => {
+    mockFetch({
+      document: {
+        ...documentContent,
+        content: [
+          '# Phase 0',
+          '',
+          'Opening content',
+          '',
+          '```js',
+          'const value = 1;',
+          '```',
+          '',
+          '| Area | Status |',
+          '| --- | --- |',
+          '| Scope | Ready |',
+          '',
+          '- preserved item',
+          '',
+          '#### Unsupported heading',
+          '',
+          '<strong>literal html</strong>'
+        ].join('\n')
+      }
+    });
+    const { container } = render(<App />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'פתיחה' }));
+
+    expect(await screen.findByRole('heading', { name: 'Phase 0', level: 1 })).toBeInTheDocument();
+    expect(screen.getByText('const value = 1;')).toBeInTheDocument();
+    expect(screen.getByRole('table')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Area' })).toBeInTheDocument();
+    expect(screen.getByRole('cell', { name: 'Ready' })).toBeInTheDocument();
+    expect(screen.getByText('- preserved item')).toBeInTheDocument();
+    expect(screen.getByText('#### Unsupported heading')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Unsupported heading', level: 4 })).not.toBeInTheDocument();
+    expect(screen.getByText('<strong>literal html</strong>')).toBeInTheDocument();
+    expect(container.querySelector('.markdown strong')).not.toBeInTheDocument();
   });
 
   test('switches to edit mode and cancels without saving', async () => {

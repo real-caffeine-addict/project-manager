@@ -151,6 +151,48 @@ textarea {
   unicode-bidi: plaintext;
 }
 
+.codeBlock,
+.rawMarkdownBlock {
+  background: #f3f6f8;
+  border: 1px solid #d9e1e8;
+  border-radius: 6px;
+  overflow: auto;
+  padding: 14px;
+  white-space: pre-wrap;
+}
+
+.codeBlock {
+  color: #123047;
+  direction: ltr;
+  text-align: left;
+}
+
+.rawMarkdownBlock {
+  color: #5c6670;
+}
+
+.markdownTableWrap {
+  margin-bottom: 16px;
+  overflow-x: auto;
+}
+
+.markdownTable {
+  border-collapse: collapse;
+  min-width: 100%;
+}
+
+.markdownTable th,
+.markdownTable td {
+  border: 1px solid #d9e1e8;
+  padding: 10px;
+  text-align: start;
+  vertical-align: top;
+}
+
+.markdownTable th {
+  background: #e9eef3;
+}
+
 .editorPane textarea {
   direction: ltr;
   font-family: Consolas, monospace;

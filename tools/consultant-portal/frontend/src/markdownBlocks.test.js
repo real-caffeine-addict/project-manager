@@ -60,11 +60,12 @@ describe('markdownBlocks', () => {
   });
 
   test('preserves unsupported markdown as raw blocks', () => {
-    const markdown = '- item one\n- item two\n\n> quoted';
+    const markdown = '- item one\n- item two\n\n> quoted\n\n#### Unsupported heading';
 
     expect(parseMarkdownDocument(markdown)).toEqual([
       { type: 'raw', raw: '- item one\n- item two' },
-      { type: 'raw', raw: '> quoted' }
+      { type: 'raw', raw: '> quoted' },
+      { type: 'raw', raw: '#### Unsupported heading' }
     ]);
     expect(serializeMarkdownBlocks(parseMarkdownDocument(markdown))).toBe(markdown);
   });

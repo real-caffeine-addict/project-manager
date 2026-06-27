@@ -208,7 +208,7 @@ function serializeTableRow(cells) {
 }
 
 function isUnsupportedMarkdownStart(line) {
-  return /^(\s{0,3}[-*+]\s+|\s{0,3}\d+\.\s+|\s{0,3}>|\s{0,3}---+\s*$|\s{0,3}<[A-Za-z!/])/.test(line);
+  return /^(\s{0,3}#{4,}\s+|\s{0,3}[-*+]\s+|\s{0,3}\d+\.\s+|\s{0,3}>|\s{0,3}---+\s*$|\s{0,3}<[A-Za-z!/])/.test(line);
 }
 
 function collectRawBlock(lines, startIndex) {
