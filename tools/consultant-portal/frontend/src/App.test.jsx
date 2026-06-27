@@ -194,6 +194,42 @@ describe('App', () => {
     ].join('\n'));
   });
 
+  test('edits table cells without changing table structure', async () => {
+    mockFetch({
+      document: {
+        ...documentContent,
+        content: [
+          '# Phase 0',
+          '',
+          '| Area | Status |',
+          '| --- | --- |',
+          '| Scope | Ready |',
+          '| Risk | Open |'
+        ].join('\n')
+      }
+    });
+    render(<App />);
+    await userEvent.click(await screen.findByRole('button', { name: 'פתיחה' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'עריכה' }));
+
+    const firstCell = screen.getByLabelText('תא טבלה 1-2');
+    await userEvent.clear(firstCell);
+    await userEvent.type(firstCell, 'Ready | blocked');
+    await userEvent.click(screen.getByRole('button', { name: 'שמירה' }));
+
+    const saveCall = global.fetch.mock.calls.find(([url, options]) => (
+      url === '/api/documents/cGhhc2UtMC5tZA' && options?.method === 'PUT'
+    ));
+    expect(JSON.parse(saveCall[1].body).content).toBe([
+      '# Phase 0',
+      '',
+      '| Area | Status |',
+      '| --- | --- |',
+      '| Scope | Ready \\| blocked |',
+      '| Risk | Open |'
+    ].join('\n'));
+  });
+
   test('validates the suggestion form', async () => {
     render(<App />);
     await userEvent.click(await screen.findByRole('button', { name: 'פתיחה' }));

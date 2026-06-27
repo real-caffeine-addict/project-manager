@@ -20,6 +20,16 @@ export function MarkdownEditor({ blocks, onChange }) {
   return (
     <div className="editorBlocks">
       {blocks.map((block, index) => {
+        if (block.type === 'table') {
+          return (
+            <MarkdownTableEditor
+              block={block}
+              key={index}
+              onChange={(nextBlock) => updateBlock(index, nextBlock)}
+            />
+          );
+        }
+
         if (block.type !== 'paragraph') {
           return <MarkdownBlock block={block} key={index} />;
         }
@@ -79,6 +89,63 @@ function MarkdownBlock({ block }) {
   );
 }
 
+function MarkdownTableEditor({ block, onChange }) {
+  function updateHeaderCell(cellIndex, value) {
+    onChange({
+      ...block,
+      header: block.header.map((cell, index) => (index === cellIndex ? sanitizeTableInput(value) : cell))
+    });
+  }
+
+  function updateBodyCell(rowIndex, cellIndex, value) {
+    onChange({
+      ...block,
+      rows: block.rows.map((row, index) => (
+        index === rowIndex
+          ? row.map((cell, innerIndex) => (innerIndex === cellIndex ? sanitizeTableInput(value) : cell))
+          : row
+      ))
+    });
+  }
+
+  return (
+    <div className="markdownTableWrap">
+      <table className="markdownTable editableMarkdownTable">
+        <thead>
+          <tr>
+            {block.header.map((cell, cellIndex) => (
+              <th key={cellIndex}>
+                <input
+                  aria-label={`כותרת טבלה ${cellIndex + 1}`}
+                  dir="auto"
+                  value={cell}
+                  onChange={(event) => updateHeaderCell(cellIndex, event.target.value)}
+                />
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {block.rows.map((row, rowIndex) => (
+            <tr key={rowIndex}>
+              {row.map((cell, cellIndex) => (
+                <td key={cellIndex}>
+                  <input
+                    aria-label={`תא טבלה ${rowIndex + 1}-${cellIndex + 1}`}
+                    dir="auto"
+                    value={cell}
+                    onChange={(event) => updateBodyCell(rowIndex, cellIndex, event.target.value)}
+                  />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function MarkdownTable({ block }) {
   return (
     <div className="markdownTableWrap">
@@ -102,4 +169,8 @@ function MarkdownTable({ block }) {
 
 function getParagraphNumber(blocks, blockIndex) {
   return blocks.slice(0, blockIndex + 1).filter((block) => block.type === 'paragraph').length;
+}
+
+function sanitizeTableInput(value) {
+  return value.replace(/\r?\n/g, ' ');
 }

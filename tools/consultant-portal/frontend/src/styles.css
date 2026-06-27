@@ -213,6 +213,16 @@ textarea {
   background: #e9eef3;
 }
 
+.editableMarkdownTable input {
+  min-width: 160px;
+  width: 100%;
+}
+
+.editableMarkdownTable th,
+.editableMarkdownTable td {
+  padding: 6px;
+}
+
 .suggestions {
   display: grid;
   gap: 10px;
