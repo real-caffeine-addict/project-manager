@@ -35,13 +35,13 @@ public class AuthController {
     }
 
     @PostMapping("/start")
-    public OtpChallengeResponse start(@RequestBody AuthRequest request) throws IOException {
-        return new OtpChallengeResponse(auth.startChallenge(request.email(), request.mobile()));
+    public OtpChallengeResponse start(@RequestBody AuthRequest request, HttpServletRequest httpRequest) throws IOException {
+        return new OtpChallengeResponse(auth.startChallenge(request.email(), request.mobile(), remoteIp(httpRequest)));
     }
 
     @PostMapping("/verify")
-    public ResponseEntity<AuthStatus> verify(@RequestBody OtpVerifyRequest request) {
-        String token = auth.verify(request.challengeId(), request.otp());
+    public ResponseEntity<AuthStatus> verify(@RequestBody OtpVerifyRequest request, HttpServletRequest httpRequest) {
+        String token = auth.verify(request.challengeId(), request.otp(), remoteIp(httpRequest));
         ResponseCookie cookie = ResponseCookie.from(SESSION_COOKIE, token)
                 .httpOnly(true)
                 .secure(secureCookie)
@@ -100,5 +100,13 @@ public class AuthController {
                 .map(Cookie::getValue)
                 .findFirst()
                 .orElse("");
+    }
+
+    private static String remoteIp(HttpServletRequest request) {
+        String forwardedFor = request.getHeader("X-Forwarded-For");
+        if (forwardedFor != null && !forwardedFor.isBlank()) {
+            return forwardedFor.split(",", 2)[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 }

@@ -30,7 +30,7 @@ public class OtpMailService implements OtpSender {
     public void sendOtp(String email, String otp) {
         if (mailSender == null) {
             if (consoleFallback) {
-                LOGGER.warn("OTP for {} is {}", email, otp);
+                LOGGER.warn("auth_event=otp_console_fallback email={}", maskEmail(email));
                 return;
             }
             throw new IllegalStateException("Mail sender is not configured.");
@@ -44,5 +44,16 @@ public class OtpMailService implements OtpSender {
         message.setSubject("Consultant Review Portal OTP");
         message.setText("Your Consultant Review Portal code is: " + otp + "\n\nThis code expires soon.");
         mailSender.send(message);
+    }
+
+    private String maskEmail(String email) {
+        if (!StringUtils.hasText(email)) {
+            return "";
+        }
+        int at = email.indexOf('@');
+        if (at <= 1) {
+            return "***" + (at >= 0 ? email.substring(at) : "");
+        }
+        return email.charAt(0) + "***" + email.substring(at);
     }
 }
