@@ -1,14 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { parseMarkdownDocument } from './markdownBlocks.js';
+import { MarkdownDocument, MarkdownEditor } from './MarkdownDocument.jsx';
+import { parseMarkdownDocument, serializeMarkdownBlocks } from './markdownBlocks.js';
 
 const TYPES = ['Correction', 'Missing Scenario', 'Domain Risk', 'Contractual Risk', 'Terminology', 'Process Improvement', 'Question'];
 const SEVERITIES = ['Low', 'Medium', 'High', 'Blocking'];
 const STATUSES = ['Open', 'Accepted', 'Rejected', 'Needs Discussion'];
-const HEADING_TAGS = {
-  1: 'h1',
-  2: 'h2',
-  3: 'h3'
-};
 
 async function api(path, options) {
   const response = await fetch(path, {
@@ -277,21 +273,26 @@ function DocumentsPage({ documents, onOpen }) {
 
 function DocumentPage({ document, suggestions, onSaved, onError, onSuggestionCreated, onSuggestionDeleted }) {
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(document.content);
+  const [draftBlocks, setDraftBlocks] = useState(() => parseMarkdownDocument(document.content));
   const [showSuggestionForm, setShowSuggestionForm] = useState(false);
   const documentBlocks = useMemo(() => parseMarkdownDocument(document.content), [document.content]);
 
   useEffect(() => {
-    setDraft(document.content);
+    setDraftBlocks(parseMarkdownDocument(document.content));
     setEditing(false);
   }, [document.content]);
+
+  function startEditing() {
+    setDraftBlocks(documentBlocks);
+    setEditing(true);
+  }
 
   async function save() {
     if (!window.confirm('This will modify the local copied Markdown file.')) return;
     try {
       await api(`/api/documents/${document.encodedPath}`, {
         method: 'PUT',
-        body: JSON.stringify({ content: draft })
+        body: JSON.stringify({ content: serializeMarkdownBlocks(draftBlocks) })
       });
       onSaved('השינוי נשמר במסמך המקומי');
     } catch (err) {
@@ -307,17 +308,17 @@ function DocumentPage({ document, suggestions, onSaved, onError, onSuggestionCre
           <p>{document.relativePath}</p>
         </div>
         <div className="actions">
-          {!editing && <button onClick={() => setEditing(true)}>עריכה</button>}
+          {!editing && <button onClick={startEditing}>עריכה</button>}
           <button onClick={() => setShowSuggestionForm(true)}>הוספת הצעת שינוי</button>
         </div>
       </div>
 
       {editing ? (
         <div className="editorPane">
-          <textarea aria-label="תוכן המסמך" value={draft} onChange={(event) => setDraft(event.target.value)} />
+          <MarkdownEditor blocks={draftBlocks} onChange={setDraftBlocks} />
           <div className="actions">
             <button onClick={save}>שמירה</button>
-            <button className="secondary" onClick={() => { setDraft(document.content); setEditing(false); }}>ביטול</button>
+            <button className="secondary" onClick={() => { setDraftBlocks(documentBlocks); setEditing(false); }}>ביטול</button>
           </div>
         </div>
       ) : (
@@ -339,73 +340,6 @@ function DocumentPage({ document, suggestions, onSaved, onError, onSuggestionCre
         />
       )}
     </section>
-  );
-}
-
-function MarkdownDocument({ blocks }) {
-  return (
-    <article className="markdown">
-      {blocks.map((block, index) => <MarkdownBlock block={block} key={index} />)}
-    </article>
-  );
-}
-
-function MarkdownBlock({ block }) {
-  if (block.type === 'heading') {
-    const HeadingTag = HEADING_TAGS[block.depth] || 'p';
-    return <HeadingTag dir="auto">{block.text}</HeadingTag>;
-  }
-
-  if (block.type === 'paragraph') {
-    return (
-      <p dir="auto">
-        {block.text.split('\n').map((line, index) => (
-          <span key={index}>
-            {index > 0 && <br />}
-            {line}
-          </span>
-        ))}
-      </p>
-    );
-  }
-
-  if (block.type === 'code') {
-    return (
-      <pre className="codeBlock" dir="ltr">
-        <code>{block.code}</code>
-      </pre>
-    );
-  }
-
-  if (block.type === 'table') {
-    return <MarkdownTable block={block} />;
-  }
-
-  return (
-    <pre className="rawMarkdownBlock" dir="auto">
-      <code>{block.raw}</code>
-    </pre>
-  );
-}
-
-function MarkdownTable({ block }) {
-  return (
-    <div className="markdownTableWrap">
-      <table className="markdownTable">
-        <thead>
-          <tr>
-            {block.header.map((cell, index) => <th key={index} dir="auto">{cell}</th>)}
-          </tr>
-        </thead>
-        <tbody>
-          {block.rows.map((row, rowIndex) => (
-            <tr key={rowIndex}>
-              {row.map((cell, cellIndex) => <td key={cellIndex} dir="auto">{cell}</td>)}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
   );
 }
 

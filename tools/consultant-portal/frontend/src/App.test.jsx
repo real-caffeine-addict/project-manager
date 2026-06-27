@@ -35,9 +35,9 @@ function mockFetch({ suggestions = [suggestion], authenticated = true, document 
     if (url === '/api/auth/logout') return json({ authenticated: false, email: null });
     if (url === '/api/documents') return json([documentSummary]);
     if (url === '/api/suggestions' && !options.method) return json(suggestions);
+    if (url === '/api/documents/cGhhc2UtMC5tZA' && options.method === 'PUT') return json({ ...document, content: JSON.parse(options.body).content });
     if (url === '/api/documents/cGhhc2UtMC5tZA') return json(document);
     if (url === '/api/documents/cGhhc2UtMC5tZA/suggestions') return json(suggestions);
-    if (url === '/api/documents/cGhhc2UtMC5tZA' && options.method === 'PUT') return json({ ...document, content: JSON.parse(options.body).content });
     if (url === '/api/suggestions' && options.method === 'POST') return json({ ...suggestion, id: 's2' });
     if (url === '/api/suggestions/s1/status') return json({ ...suggestion, status: JSON.parse(options.body).status });
     if (url === '/api/suggestions/s1/owner-comment') return json({ ...suggestion, ownerComment: JSON.parse(options.body).ownerComment });
@@ -138,24 +138,60 @@ describe('App', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'פתיחה' }));
     await userEvent.click(await screen.findByRole('button', { name: 'עריכה' }));
 
-    const editor = screen.getByLabelText('תוכן המסמך');
+    const editor = screen.getByLabelText('פסקה 1');
     await userEvent.clear(editor);
-    await userEvent.type(editor, '# Changed');
+    await userEvent.type(editor, 'Changed paragraph');
     await userEvent.click(screen.getByRole('button', { name: 'ביטול' }));
 
-    expect(screen.queryByLabelText('תוכן המסמך')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('פסקה 1')).not.toBeInTheDocument();
     expect(global.fetch).not.toHaveBeenCalledWith('/api/documents/cGhhc2UtMC5tZA', expect.objectContaining({ method: 'PUT' }));
   });
 
-  test('asks for confirmation before saving edited content', async () => {
+  test('asks for confirmation before saving edited paragraph content', async () => {
+    mockFetch({
+      document: {
+        ...documentContent,
+        content: [
+          '# Phase 0',
+          '',
+          'Opening content',
+          '',
+          '```js',
+          'const value = 1;',
+          '```',
+          '',
+          '| Area | Status |',
+          '| --- | --- |',
+          '| Scope | Ready |'
+        ].join('\n')
+      }
+    });
     render(<App />);
     await userEvent.click(await screen.findByRole('button', { name: 'פתיחה' }));
     await userEvent.click(await screen.findByRole('button', { name: 'עריכה' }));
-    await userEvent.type(screen.getByLabelText('תוכן המסמך'), '\nNew line');
+    await userEvent.type(screen.getByLabelText('פסקה 1'), '\nNew line');
     await userEvent.click(screen.getByRole('button', { name: 'שמירה' }));
 
     expect(window.confirm).toHaveBeenCalledWith('This will modify the local copied Markdown file.');
     expect(global.fetch).toHaveBeenCalledWith('/api/documents/cGhhc2UtMC5tZA', expect.objectContaining({ method: 'PUT' }));
+
+    const saveCall = global.fetch.mock.calls.find(([url, options]) => (
+      url === '/api/documents/cGhhc2UtMC5tZA' && options?.method === 'PUT'
+    ));
+    expect(JSON.parse(saveCall[1].body).content).toBe([
+      '# Phase 0',
+      '',
+      'Opening content',
+      'New line',
+      '',
+      '```js',
+      'const value = 1;',
+      '```',
+      '',
+      '| Area | Status |',
+      '| --- | --- |',
+      '| Scope | Ready |'
+    ].join('\n'));
   });
 
   test('validates the suggestion form', async () => {

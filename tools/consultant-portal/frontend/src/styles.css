@@ -151,6 +151,26 @@ textarea {
   unicode-bidi: plaintext;
 }
 
+.editorBlocks {
+  display: grid;
+  gap: 16px;
+  line-height: 1.7;
+  margin-bottom: 16px;
+  text-align: start;
+  unicode-bidi: plaintext;
+}
+
+.paragraphEditor {
+  color: #52606d;
+}
+
+.paragraphEditor textarea {
+  color: #1f2933;
+  direction: inherit;
+  min-height: 120px;
+  width: 100%;
+}
+
 .codeBlock,
 .rawMarkdownBlock {
   background: #f3f6f8;
@@ -191,13 +211,6 @@ textarea {
 
 .markdownTable th {
   background: #e9eef3;
-}
-
-.editorPane textarea {
-  direction: ltr;
-  font-family: Consolas, monospace;
-  min-height: 520px;
-  width: 100%;
 }
 
 .suggestions {
