@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import App from './App.jsx';
@@ -200,6 +200,20 @@ describe('App', () => {
     expect(savedContent.endsWith('<!-- consultant-portal-edit-footer:end -->')).toBe(true);
   });
 
+  test('escapes paragraph triple backticks before saving', async () => {
+    render(<App />);
+    await userEvent.click(await screen.findByRole('button', { name: 'פתיחה' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'עריכה' }));
+
+    fireEvent.change(screen.getByLabelText('פסקה 1'), { target: { value: '```code```' } });
+    await userEvent.click(screen.getByRole('button', { name: 'שמירה' }));
+
+    const saveCall = global.fetch.mock.calls.find(([url, options]) => (
+      url === '/api/documents/cGhhc2UtMC5tZA' && options?.method === 'PUT'
+    ));
+    expect(JSON.parse(saveCall[1].body).content).toContain('\\`\\`\\`code\\`\\`\\`');
+  });
+
   test('edits table cells without changing table structure', async () => {
     mockFetch({
       document: {
@@ -242,6 +256,32 @@ describe('App', () => {
     expect(savedContent.endsWith('<!-- consultant-portal-edit-footer:end -->')).toBe(true);
   });
 
+  test('does not save multiline table cell input', async () => {
+    mockFetch({
+      document: {
+        ...documentContent,
+        content: [
+          '# Phase 0',
+          '',
+          '| Area | Status |',
+          '| --- | --- |',
+          '| Scope | Ready |'
+        ].join('\n')
+      }
+    });
+    render(<App />);
+    await userEvent.click(await screen.findByRole('button', { name: 'פתיחה' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'עריכה' }));
+
+    fireEvent.change(screen.getByLabelText('תא טבלה 1-2'), { target: { value: 'Ready\nBlocked' } });
+    await userEvent.click(screen.getByRole('button', { name: 'שמירה' }));
+
+    const saveCall = global.fetch.mock.calls.find(([url, options]) => (
+      url === '/api/documents/cGhhc2UtMC5tZA' && options?.method === 'PUT'
+    ));
+    expect(JSON.parse(saveCall[1].body).content).toContain('| Scope | ReadyBlocked |');
+  });
+
   test('validates the suggestion form', async () => {
     render(<App />);
     await userEvent.click(await screen.findByRole('button', { name: 'פתיחה' }));
@@ -278,6 +318,28 @@ describe('App', () => {
     const list = screen.getByText('Fix typo').closest('.suggestions');
     expect(within(list).getByText('Fix typo')).toBeInTheDocument();
     expect(screen.queryByText('Should this include billing?')).not.toBeInTheDocument();
+  });
+
+  test('updates suggestion status and owner comment from the dashboard', async () => {
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'סקירת הצעות' }));
+    await userEvent.click(await screen.findByRole('button', { name: /Should this include billing/ }));
+    await userEvent.selectOptions(screen.getByLabelText('סטטוס טיפול'), 'Needs Discussion');
+    await userEvent.click(screen.getByRole('button', { name: 'שמירת סטטוס' }));
+    await userEvent.type(screen.getByLabelText('תגובה של בעל הפרויקט'), 'Please clarify billing scope');
+    await userEvent.click(screen.getByRole('button', { name: 'שמירת תגובה' }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith('/api/suggestions/s1/status', expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'Needs Discussion' })
+      }));
+      expect(global.fetch).toHaveBeenCalledWith('/api/suggestions/s1/owner-comment', expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ ownerComment: 'Please clarify billing scope' })
+      }));
+    });
   });
 
   test('removes a suggestion from the document view', async () => {

@@ -42,7 +42,7 @@ export function MarkdownEditor({ blocks, onChange }) {
               aria-label={`פסקה ${paragraphNumber}`}
               dir="auto"
               value={block.text}
-              onChange={(event) => updateBlock(index, { ...block, text: event.target.value })}
+              onChange={(event) => updateBlock(index, { ...block, text: sanitizeParagraphInput(event.target.value) })}
             />
           </label>
         );
@@ -173,4 +173,8 @@ function getParagraphNumber(blocks, blockIndex) {
 
 function sanitizeTableInput(value) {
   return value.replace(/\r?\n/g, ' ');
+}
+
+function sanitizeParagraphInput(value) {
+  return value.replace(/```/g, '\\`\\`\\`');
 }

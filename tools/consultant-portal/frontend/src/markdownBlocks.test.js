@@ -27,6 +27,17 @@ describe('markdownBlocks', () => {
     expect(serializeMarkdownBlocks(parseMarkdownDocument(markdown))).toBe(markdown);
   });
 
+  test('does not treat single-line triple backticks as a fenced code block', () => {
+    const markdown = 'Before\n\n```code```\n\nAfter';
+
+    expect(parseMarkdownDocument(markdown)).toEqual([
+      { type: 'paragraph', text: 'Before' },
+      { type: 'paragraph', text: '```code```' },
+      { type: 'paragraph', text: 'After' }
+    ]);
+    expect(serializeMarkdownBlocks(parseMarkdownDocument(markdown))).toBe(markdown);
+  });
+
   test('parses simple pipe tables with fixed dimensions', () => {
     const blocks = parseMarkdownDocument('| Name | Notes |\n| --- | --- |\n| Dana | Uses \\| safely |');
 

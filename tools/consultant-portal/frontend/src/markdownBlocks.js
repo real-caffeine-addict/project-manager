@@ -93,7 +93,7 @@ function parseHeading(line) {
 }
 
 function isFenceStart(line) {
-  return line.startsWith('```');
+  return /^```\s*[\w-]*\s*$/.test(line);
 }
 
 function collectCodeBlock(lines, startIndex) {
