@@ -6,4 +6,4 @@
 | TSK0002 | Delete accidental files added to repo | Done |
 | TSK0003 | Structured Markdown form editor for the Consultant Review Portal | Done |
 | TSK0004 | DEV authentication bypass for Consultant Review Portal | Void |
-| TSK0005 | Simplify project markdowns to meet portal rendering abilities | Pending |
+| TSK0005 | Simplify project markdowns to meet portal rendering abilities | In progress |
