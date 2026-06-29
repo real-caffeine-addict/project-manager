@@ -8,65 +8,53 @@ The matrix classifies project document types by lifecycle stage, document family
 
 This is a definition file. It should stay focused on classification.
 
----
-
 ## Direction Values
 
 | Direction | Meaning |
-|---|---|
+| --- | --- |
 | Incoming | Received by the contractor from another project party. |
 | Outgoing | Issued by the contractor to another project party. |
 | Both | Can be either incoming or outgoing depending on project context. |
 
----
-
 ## Control Values
 
 | Value | Meaning |
-|---|---|
+| --- | --- |
 | Yes | Managed as a controlled document or controlled record. |
 | No | Not normally managed through document control. |
 | Sometimes | Depends on contract, project requirements, client/EPC procedure, or document use. |
 
----
-
 ## Revision Control Values
 
 | Value | Meaning |
-|---|---|
+| --- | --- |
 | Yes | Managed through formal revisions. |
 | No | Not normally managed through revisions. |
 | Usually no | Revision control is not typical, but corrections/reissues may occur. |
 | Sometimes | Depends on project convention or document use. |
 
----
-
 ## MVP Priority Values
 
 | Priority | Meaning |
-|---|---|
+| --- | --- |
 | Include | Candidate for direct support in the MVP document register. |
 | Register only | Register as a document, but avoid dedicated workflow or deep modeling in MVP. |
 | Maybe | Include only if required by the first real customer workflow. |
 | Define only | Define and recognize now, but avoid implementation in MVP. |
 | Later | Defer to a later project phase. |
 
----
-
 ## Expiry Tracking Values
 
 | Value | Meaning |
-|---|---|
+| --- | --- |
 | Yes | Expiry date or validity period should be tracked. |
 | No | Expiry tracking is not normally relevant. |
 | Sometimes | Depends on document type, project rules, or issuing authority. |
 
----
-
 ## Matrix
 
 | Lifecycle Stage | Document Family | Document Type | Direction | Controlled | Revision Controlled | Expiry Tracking | Typical Originator | MVP Priority | Notes |
-|---|---|---|---|---|---|---|---|---|---|
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Contract / Kickoff | Contractual | Contract | Incoming / Both | Yes | Yes | No | Client / EPC / Contractor | Register only | Defines obligations, scope, deliverables, commercial terms, and responsibilities. |
 | Contract / Kickoff | Contractual | Scope Document | Incoming / Both | Yes | Yes | No | Client / EPC / Contractor | Register only | Defines technical or commercial scope. |
 | Contract / Kickoff | Contractual | Project Requirements | Incoming | Yes | Yes | No | Client / EPC | Register only | Defines required deliverables, procedures, and approval obligations. |
