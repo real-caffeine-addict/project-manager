@@ -1,1 +1,4 @@
 tools/consultant-portal/formatting_instructions.md
+
+.idea/
+*.iml
